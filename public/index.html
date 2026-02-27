@@ -7,26 +7,33 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/@fingerprintjs/fingerprintjs@4/dist/fp.min.js"></script>
 </head>
-<body class="bg-slate-950 text-slate-200 min-h-screen flex items-center justify-center p-4 font-sans">
+<body class="bg-slate-950 text-slate-200 min-h-screen p-4 md:p-8 font-sans">
 
-    <div class="w-full max-w-lg bg-slate-900 p-8 rounded-2xl shadow-2xl border border-slate-800">
-        <h2 class="text-3xl font-black mb-2 text-center text-red-500 tracking-tight">SECURITY DASHBOARD</h2>
-        <p class="text-slate-500 text-center mb-8 text-sm">Anti-Abuse & Threat Detection Tool</p>
+    <div class="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-6">
         
-        <input type="text" id="ipInput" placeholder="IP လိပ်စာ ရိုက်ထည့်ပါ..." 
-               class="w-full p-4 mb-4 rounded-lg bg-slate-800 border border-slate-700 focus:outline-none focus:border-red-500 transition text-white placeholder-slate-500">
-        
-        <button onclick="investigate()" id="searchBtn"
-                class="w-full bg-red-600 hover:bg-red-700 p-4 rounded-lg font-bold transition flex items-center justify-center gap-2">
-            <span>စစ်ဆေးမည်</span>
-        </button>
+        <div class="md:col-span-2 bg-slate-900 p-8 rounded-2xl shadow-2xl border border-slate-800">
+            <h2 class="text-3xl font-black mb-2 text-center text-red-500 tracking-tight">SECURITY DASHBOARD</h2>
+            <p class="text-slate-500 text-center mb-8 text-sm">Anti-Abuse & Threat Detection Tool</p>
+            
+            <input type="text" id="ipInput" placeholder="IP လိပ်စာ ရိုက်ထည့်ပါ..." 
+                   class="w-full p-4 mb-4 rounded-lg bg-slate-800 border border-slate-700 focus:outline-none focus:border-red-500 transition text-white placeholder-slate-500">
+            
+            <button onclick="investigate()" id="searchBtn"
+                    class="w-full bg-red-600 hover:bg-red-700 p-4 rounded-lg font-bold transition flex items-center justify-center gap-2">
+                <span>စစ်ဆေးမည်</span>
+            </button>
 
-        <div id="placeholder" class="mt-8 text-center text-slate-600">
-            <svg class="w-16 h-16 mx-auto mb-4 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
-            <p>IP တစ်ခုခု ရိုက်ထည့်ပြီး စစ်ဆေးရန် အသင့်ဖြစ်ပါသည်</p>
+            <div id="result" class="mt-8 hidden space-y-4"></div>
         </div>
 
-        <div id="result" class="mt-8 hidden space-y-4"></div>
+        <div class="bg-slate-800 p-6 rounded-2xl border border-slate-700 h-fit">
+            <h3 class="text-lg font-bold text-red-500 mb-4">💡 အသုံးပြုနည်းလမ်းညွှန်</h3>
+            <ul class="space-y-4 text-sm text-slate-300">
+                <li><strong>Device ID:</strong> မင်းရဲ့ ကွန်ပျူတာ/ဖုန်းရဲ့ ထူးခြားတဲ့ လက်ဗွေရာ။ ဒါတူရင် တစ်ယောက်တည်းပဲ။</li>
+                <li><strong>ISP:</strong> အင်တာနက် ဝန်ဆောင်မှုပေးသူ။ Data Center ဆိုရင် Bot ဖြစ်ဖို့ များတယ်။</li>
+                <li><strong>Risk Score:</strong> ၄၀ ကျော်ရင် သံသယဖြစ်ဖွယ်ကောင်းတဲ့ Traffic လို့ သတ်မှတ်ပါ။</li>
+            </ul>
+        </div>
     </div>
 
     <script>
@@ -35,31 +42,37 @@
         async function investigate() {
             const ip = document.getElementById('ipInput').value;
             const resDiv = document.getElementById('result');
-            const placeholder = document.getElementById('placeholder');
             const btn = document.getElementById('searchBtn');
 
             if(!ip) return alert("IP လိပ်စာ ထည့်ပေးပါဦး သာကြီး!");
 
-            // UI Loading State
-            placeholder.classList.add('hidden');
-            resDiv.classList.remove('hidden');
             btn.disabled = true;
             btn.innerText = "စစ်ဆေးနေသည်...";
+            resDiv.classList.remove('hidden');
             resDiv.innerHTML = "<div class='text-center animate-pulse'>System Analyzing...</div>";
 
             try {
-                // Get Device Fingerprint
                 const fp = await fpPromise;
                 const result = await fp.get();
                 const visitorId = result.visitorId;
 
-                // Fetch Data
                 const response = await fetch(`/api/lookup?ip=${ip}`);
                 const data = await response.json();
 
                 if (data.error) throw new Error(data.error);
 
-                // Security Logic
+                // Multi-Account Detection Logic
+                let history = JSON.parse(localStorage.getItem('userHistory') || '{}');
+                let warning = "";
+                
+                if (history[visitorId] && history[visitorId] !== ip) {
+                    warning = `<div class="bg-orange-900/50 border border-orange-500 p-3 rounded text-orange-200 text-xs mt-2">⚠️ WARNING: တူညီသော Device ID ဖြင့် အခြား IP (${history[visitorId]}) သုံးထားသည်!</div>`;
+                }
+                
+                // Save to history
+                history[visitorId] = ip;
+                localStorage.setItem('userHistory', JSON.stringify(history));
+
                 const isVPN = data.security?.is_vpn;
                 const riskScore = data.security?.threat_score || 0;
                 const statusColor = (isVPN || riskScore > 40) ? 'border-red-500' : 'border-emerald-500';
@@ -68,9 +81,9 @@
                     <div class="border-l-4 ${statusColor} bg-slate-800 p-5 rounded-r-lg">
                         <div class="flex justify-between items-start mb-4">
                             <h3 class="font-bold text-lg text-white">Security Report</h3>
-                            <button onclick="copyData()" class="text-xs bg-slate-700 px-3 py-1 rounded hover:bg-slate-600 transition">Copy ID</button>
                         </div>
-                        <div class="space-y-2 text-sm">
+                        ${warning}
+                        <div class="space-y-2 text-sm mt-2">
                             <p><span class="text-slate-400">Device ID:</span> <code class="bg-slate-900 px-2 py-0.5 rounded">${visitorId}</code></p>
                             <p><span class="text-slate-400">IP:</span> ${data.ip_address || ip}</p>
                             <p><span class="text-slate-400">ISP:</span> ${data.company?.name || "N/A"}</p>
@@ -87,12 +100,6 @@
                 btn.disabled = false;
                 btn.innerText = "စစ်ဆေးမည်";
             }
-        }
-
-        function copyData() {
-            const code = document.querySelector('code').innerText;
-            navigator.clipboard.writeText(code);
-            alert("Device ID ကူးယူပြီးပါပြီ!");
         }
     </script>
 </body>
