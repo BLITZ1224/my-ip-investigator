@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="my">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IP Investigator Pro</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-900 text-white min-h-screen flex items-center justify-center p-4">
+
+    <div class="w-full max-w-md bg-gray-800 p-8 rounded-xl shadow-2xl border border-gray-700">
+        <h2 class="text-2xl font-bold mb-6 text-center text-red-500">IP Investigator</h2>
+        
+        <input type="text" id="ipInput" placeholder="IP လိပ်စာ ရိုက်ထည့်ပါ..." 
+               class="w-full p-3 mb-4 rounded bg-gray-700 border border-gray-600 focus:outline-none focus:border-red-500 text-white">
+        
+        <button onclick="investigate()" id="searchBtn"
+                class="w-full bg-red-600 hover:bg-red-700 p-3 rounded font-bold transition">စစ်ဆေးမည်</button>
+
+        <div id="result" class="mt-6 hidden p-4 bg-gray-700 rounded text-sm space-y-2">
+            </div>
+    </div>
+
+    <script>
+        async function investigate() {
+            const ip = document.getElementById('ipInput').value;
+            const resDiv = document.getElementById('result');
+            const btn = document.getElementById('searchBtn');
+
+            if(!ip) return alert("IP လိပ်စာ ထည့်ပေးပါဦး သာကြီး!");
+
+            btn.innerText = "စစ်ဆေးနေသည်...";
+            btn.disabled = true;
+            resDiv.classList.remove('hidden');
+            resDiv.innerHTML = "အချက်အလက်များ ရယူနေသည်...";
+
+            try {
+                // ⚠️ အရေးကြီး: API Key ကို Code ထဲမှာ မထည့်တော့ဘဲ Proxy ကိုပဲ ခေါ်တယ်
+                const response = await fetch(`/api/lookup?ip=${ip}`);
+                const data = await response.json();
+
+                if (data.error) throw new Error(data.error);
+
+                // UI Display Logic
+                const country = data.country || data.location?.country || "မသိရှိရပါ";
+                const region = (data.location && data.location.region) ? data.location.region : "မသိရှိရပါ";
+                const ispName = data.company?.name || data.asn?.name || "မသိရှိရပါ";
+                const vpnStatus = data.security?.is_vpn ? '🔴 VPN/Proxy တွေ့ရှိသည်' : '🟢 Clean';
+
+                resDiv.innerHTML = `
+                    <p><span class="text-gray-400">IP:</span> ${data.ip_address || ip}</p>
+                    <p><span class="text-gray-400">နိုင်ငံ:</span> ${country}</p>
+                    <p><span class="text-gray-400">တိုင်း/ပြည်နယ်:</span> ${region}</p>
+                    <p><span class="text-gray-400">ISP:</span> ${ispName}</p>
+                    <p class="font-bold mt-2 text-lg">VPN အခြေအနေ: ${vpnStatus}</p>
+                `;
+            } catch (error) {
+                resDiv.innerHTML = `<p class='text-red-400'>Error: ${error.message}</p>`;
+            } finally {
+                btn.innerText = "စစ်ဆေးမည်";
+                btn.disabled = false;
+            }
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,3 @@
+# .gitignore ဖိုင်ထဲတွင် ထည့်ရန်
+.env
+node_modules
