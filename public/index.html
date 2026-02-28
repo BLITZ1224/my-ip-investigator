@@ -26,7 +26,6 @@
             </button>
 
             <div id="map" class="w-full h-64 mt-8 rounded-xl border border-slate-700 hidden"></div>
-            
             <div id="result" class="mt-8 hidden space-y-4"></div>
         </div>
 
@@ -35,8 +34,8 @@
                 <h3 class="text-lg font-bold text-red-500 mb-4">💡 အသုံးပြုနည်းလမ်းညွှန်</h3>
                 <ul class="space-y-4 text-sm text-slate-300">
                     <li><strong>Device ID:</strong> မင်းရဲ့ ကွန်ပျူတာ/ဖုန်းရဲ့ လက်ဗွေရာ။</li>
-                    <li><strong>ISP:</strong> အင်တာနက် ဝန်ဆောင်မှုပေးသူ။</li>
                     <li><strong>Risk Score:</strong> ၄၀ ကျော်ရင် သတိထားပါ။</li>
+                    <li><strong>Multi-Account:</strong> တူညီတဲ့ Device ID နဲ့ IP အသစ်သုံးရင် သတိပေးပါမယ်။</li>
                 </ul>
             </div>
         </div>
@@ -55,35 +54,45 @@
             if(!ip) return alert("IP လိပ်စာ ထည့်ပေးပါဦး သာကြီး!");
 
             btn.disabled = true;
-            btn.innerText = "စစ်ဆေးနေသည်...";
+            btn.innerText = "Analyzing...";
             resDiv.classList.remove('hidden');
             resDiv.innerHTML = "<div class='text-center animate-pulse'>System Analyzing...</div>";
 
             try {
+                // 1. Get Fingerprint
                 const fp = await fpPromise;
                 const result = await fp.get();
                 const visitorId = result.visitorId;
 
+                // 2. Fetch API
                 const response = await fetch(`/api/lookup?ip=${ip}`);
                 const data = await response.json();
-
                 if (data.error) throw new Error(data.error);
 
-                // UI Components
-                const countryCode = data.country_code ? data.country_code.toLowerCase() : 'unknown';
+                // 3. Multi-Account Check
+                let history = JSON.parse(localStorage.getItem('userHistory') || '{}');
+                let warning = "";
+                if (history[visitorId] && history[visitorId] !== ip) {
+                    warning = `<div class="bg-orange-900/50 border border-orange-500 p-3 rounded text-orange-200 text-xs mb-4">⚠️ WARNING: တူညီသော Device ID ဖြင့် အခြား IP (${history[visitorId]}) သုံးထားသည်!</div>`;
+                }
+                history[visitorId] = ip;
+                localStorage.setItem('userHistory', JSON.stringify(history));
+
+                // 4. UI Update
+                const countryCode = data.country_code ? data.country_code.toLowerCase() : null;
                 const isVPN = data.security?.is_vpn;
                 const riskScore = data.security?.threat_score || 0;
                 const statusColor = (isVPN || riskScore > 40) ? 'border-red-500' : 'border-emerald-500';
 
-                // Display Result
                 resDiv.innerHTML = `
                     <div class="border-l-4 ${statusColor} bg-slate-800 p-5 rounded-r-lg">
+                        ${warning}
                         <div class="flex items-center gap-3 mb-4">
-                            <img src="https://flagcdn.com/w40/${countryCode}.png" class="w-8 h-6 rounded shadow-sm border border-slate-700">
+                            ${countryCode ? `<img src="https://flagcdn.com/w40/${countryCode}.png" class="w-8 h-6 rounded shadow-sm border border-slate-700">` : ''}
                             <h3 class="font-bold text-lg text-white">${data.country || "Unknown"}</h3>
                         </div>
                         <div class="space-y-2 text-sm mt-2">
-                            <p><span class="text-slate-400">City:</span> ${data.city || "N/A"}</p>
+                            <p><span class="text-slate-400">Device ID:</span> <code class="bg-slate-900 px-1 rounded text-xs">${visitorId}</code></p>
                             <p><span class="text-slate-400">ISP:</span> ${data.company?.name || "N/A"}</p>
                             <p><span class="text-slate-400">Risk Score:</span> ${riskScore}/100</p>
                             <p class="font-bold text-lg mt-4 ${isVPN ? 'text-red-500' : 'text-emerald-500'}">
@@ -93,7 +102,7 @@
                     </div>
                 `;
 
-                // Handle Map
+                // 5. Handle Map
                 if (data.latitude && data.longitude) {
                     mapDiv.classList.remove('hidden');
                     if (!map) {
