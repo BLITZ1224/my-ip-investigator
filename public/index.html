@@ -6,6 +6,8 @@
     <title>IP Investigator Pro | Security Dashboard</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/@fingerprintjs/fingerprintjs@4/dist/fp.min.js"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 </head>
 <body class="bg-slate-950 text-slate-200 min-h-screen p-4 md:p-8 font-sans">
 
@@ -23,26 +25,32 @@
                 <span>စစ်ဆေးမည်</span>
             </button>
 
+            <div id="map" class="w-full h-64 mt-8 rounded-xl border border-slate-700 hidden"></div>
+            
             <div id="result" class="mt-8 hidden space-y-4"></div>
         </div>
 
-        <div class="bg-slate-800 p-6 rounded-2xl border border-slate-700 h-fit">
-            <h3 class="text-lg font-bold text-red-500 mb-4">💡 အသုံးပြုနည်းလမ်းညွှန်</h3>
-            <ul class="space-y-4 text-sm text-slate-300">
-                <li><strong>Device ID:</strong> မင်းရဲ့ ကွန်ပျူတာ/ဖုန်းရဲ့ ထူးခြားတဲ့ လက်ဗွေရာ။ ဒါတူရင် တစ်ယောက်တည်းပဲ။</li>
-                <li><strong>ISP:</strong> အင်တာနက် ဝန်ဆောင်မှုပေးသူ။ Data Center ဆိုရင် Bot ဖြစ်ဖို့ များတယ်။</li>
-                <li><strong>Risk Score:</strong> ၄၀ ကျော်ရင် သံသယဖြစ်ဖွယ်ကောင်းတဲ့ Traffic လို့ သတ်မှတ်ပါ။</li>
-            </ul>
+        <div class="space-y-6">
+            <div class="bg-slate-800 p-6 rounded-2xl border border-slate-700 h-fit">
+                <h3 class="text-lg font-bold text-red-500 mb-4">💡 အသုံးပြုနည်းလမ်းညွှန်</h3>
+                <ul class="space-y-4 text-sm text-slate-300">
+                    <li><strong>Device ID:</strong> မင်းရဲ့ ကွန်ပျူတာ/ဖုန်းရဲ့ လက်ဗွေရာ။</li>
+                    <li><strong>ISP:</strong> အင်တာနက် ဝန်ဆောင်မှုပေးသူ။</li>
+                    <li><strong>Risk Score:</strong> ၄၀ ကျော်ရင် သတိထားပါ။</li>
+                </ul>
+            </div>
         </div>
     </div>
 
     <script>
         const fpPromise = FingerprintJS.load();
+        let map = null;
 
         async function investigate() {
             const ip = document.getElementById('ipInput').value;
             const resDiv = document.getElementById('result');
             const btn = document.getElementById('searchBtn');
+            const mapDiv = document.getElementById('map');
 
             if(!ip) return alert("IP လိပ်စာ ထည့်ပေးပါဦး သာကြီး!");
 
@@ -61,31 +69,21 @@
 
                 if (data.error) throw new Error(data.error);
 
-                // Multi-Account Detection Logic
-                let history = JSON.parse(localStorage.getItem('userHistory') || '{}');
-                let warning = "";
-                
-                if (history[visitorId] && history[visitorId] !== ip) {
-                    warning = `<div class="bg-orange-900/50 border border-orange-500 p-3 rounded text-orange-200 text-xs mt-2">⚠️ WARNING: တူညီသော Device ID ဖြင့် အခြား IP (${history[visitorId]}) သုံးထားသည်!</div>`;
-                }
-                
-                // Save to history
-                history[visitorId] = ip;
-                localStorage.setItem('userHistory', JSON.stringify(history));
-
+                // UI Components
+                const countryCode = data.country_code ? data.country_code.toLowerCase() : 'unknown';
                 const isVPN = data.security?.is_vpn;
                 const riskScore = data.security?.threat_score || 0;
                 const statusColor = (isVPN || riskScore > 40) ? 'border-red-500' : 'border-emerald-500';
 
+                // Display Result
                 resDiv.innerHTML = `
                     <div class="border-l-4 ${statusColor} bg-slate-800 p-5 rounded-r-lg">
-                        <div class="flex justify-between items-start mb-4">
-                            <h3 class="font-bold text-lg text-white">Security Report</h3>
+                        <div class="flex items-center gap-3 mb-4">
+                            <img src="https://flagcdn.com/w40/${countryCode}.png" class="w-8 h-6 rounded shadow-sm border border-slate-700">
+                            <h3 class="font-bold text-lg text-white">${data.country || "Unknown"}</h3>
                         </div>
-                        ${warning}
                         <div class="space-y-2 text-sm mt-2">
-                            <p><span class="text-slate-400">Device ID:</span> <code class="bg-slate-900 px-2 py-0.5 rounded">${visitorId}</code></p>
-                            <p><span class="text-slate-400">IP:</span> ${data.ip_address || ip}</p>
+                            <p><span class="text-slate-400">City:</span> ${data.city || "N/A"}</p>
                             <p><span class="text-slate-400">ISP:</span> ${data.company?.name || "N/A"}</p>
                             <p><span class="text-slate-400">Risk Score:</span> ${riskScore}/100</p>
                             <p class="font-bold text-lg mt-4 ${isVPN ? 'text-red-500' : 'text-emerald-500'}">
@@ -94,6 +92,19 @@
                         </div>
                     </div>
                 `;
+
+                // Handle Map
+                if (data.latitude && data.longitude) {
+                    mapDiv.classList.remove('hidden');
+                    if (!map) {
+                        map = L.map('map').setView([data.latitude, data.longitude], 5);
+                        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+                    } else {
+                        map.setView([data.latitude, data.longitude], 5);
+                    }
+                    L.marker([data.latitude, data.longitude]).addTo(map).bindPopup(data.city).openPopup();
+                }
+
             } catch (error) {
                 resDiv.innerHTML = `<div class='bg-red-900/50 p-4 rounded text-red-400 text-center border border-red-800'>Error: ${error.message}</div>`;
             } finally {
