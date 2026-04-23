@@ -35,13 +35,12 @@
         </div>
 
         <div id="main-content" class="hidden grid grid-cols-1 lg:grid-cols-3 gap-8">
-            
             <div class="lg:col-span-2 space-y-4">
                 <div class="bg-[#0d1117] p-4 rounded-3xl border border-slate-800">
                     <div id="map"></div>
                     <div class="mt-4 flex justify-between items-center text-[10px] text-slate-500 px-2">
                         <span id="coords">COORDINATES: --, --</span>
-                        <span id="timestamp">LAST SCAN: JUST NOW</span>
+                        <span id="timestamp">SECURITY LEVEL: MONITORED</span>
                     </div>
                 </div>
             </div>
@@ -59,7 +58,7 @@
                             <p id="d-status" class="text-sm font-bold">-</p>
                         </div>
                         <div>
-                            <p class="text-[9px] text-slate-500 uppercase">Local Time (Target)</p>
+                            <p class="text-[9px] text-slate-500 uppercase">Target Local Time</p>
                             <p id="d-time" class="text-sm font-bold text-yellow-500">-</p>
                         </div>
                     </div>
@@ -107,9 +106,10 @@
 
         function getDetailedHardware() {
             const ua = navigator.userAgent;
-            let device = "PC/Desktop";
+            let device = "Generic Device";
             if (/iPhone/.test(ua)) device = "iPhone";
             else if (/Android/.test(ua)) device = "Android Mobile";
+            else if (/Windows/.test(ua)) device = "Windows PC";
             
             let browser = "Web Browser";
             if (ua.includes("Chrome")) browser = "Google Chrome";
@@ -139,6 +139,7 @@
             try {
                 const response = await fetch(`/api/lookup?ip=${ip}`);
                 const data = await response.json();
+                if (data.error) throw new Error(data.error);
                 localStorage.setItem(`forensic_cache_${ip}`, JSON.stringify(data));
                 renderUI(data);
             } catch (e) {
@@ -151,33 +152,27 @@
 
         async function renderUI(data) {
             document.getElementById('main-content').classList.remove('hidden');
-            
-            // Network Data
             document.getElementById('d-isp').innerText = data.connection?.isp_name || "Unknown ISP";
+            
             const risk = data.security?.threat_score || 0;
             const isVPN = data.security?.is_vpn;
-            
             const statusNode = document.getElementById('d-status');
             statusNode.innerText = isVPN ? "⚠️ VPN/PROXY DETECTED" : (risk < 10 ? "✅ CONNECTION CLEAN" : "🚨 UNSECURED");
             statusNode.className = isVPN || risk > 40 ? "text-sm font-bold text-red-500 animate-pulse" : "text-sm font-bold text-emerald-400";
 
-            // Timezone Logic
             const localTime = new Date().toLocaleString("en-US", { timeZone: data.timezone?.name || "Asia/Yangon" });
             document.getElementById('d-time').innerText = localTime;
 
-            // Hardware Data
             const hw = getDetailedHardware();
             document.getElementById('d-device').innerText = hw.device;
             document.getElementById('d-os').innerText = hw.platform;
             document.getElementById('d-browser').innerText = hw.browser;
             document.getElementById('d-battery').innerText = await getBattery();
 
-            // Fingerprint
             const fp = await fpPromise;
             const res = await fp.get();
             document.getElementById('d-fp').innerText = res.visitorId;
 
-            // Map
             const lat = data.latitude, lon = data.longitude;
             document.getElementById('coords').innerText = `COORDINATES: ${lat}, ${lon}`;
             if (!map) {
