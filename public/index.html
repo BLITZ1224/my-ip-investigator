@@ -3,36 +3,93 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>IP Investigator Pro | Security Dashboard</title>
+    <title>Z-SPACE | Forensic Ultimate</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/@fingerprintjs/fingerprintjs@4/dist/fp.min.js"></script>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <style>
+        @keyframes pulse-red { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+        .scan-line { height: 2px; background: rgba(239, 68, 68, 0.5); position: absolute; width: 100%; top: 0; animation: scan 3s linear infinite; }
+        @keyframes scan { from { top: 0; } to { top: 100%; } }
+        .neon-box { border: 1px solid rgba(239, 68, 68, 0.3); box-shadow: 0 0 20px rgba(0,0,0,0.5); }
+        #map { height: 350px; border-radius: 15px; }
+    </style>
 </head>
-<body class="bg-slate-950 text-slate-200 min-h-screen p-4 md:p-8 font-sans">
+<body class="bg-[#02040a] text-slate-300 min-h-screen p-4 md:p-10 font-sans">
 
-    <div class="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div class="md:col-span-2 bg-slate-900 p-8 rounded-2xl shadow-2xl border border-slate-800">
-            <h2 class="text-3xl font-black mb-2 text-center text-red-500 tracking-tight">SECURITY DASHBOARD</h2>
-            <p class="text-slate-500 text-center mb-8 text-sm">Caching Enabled | Anti-Abuse System</p>
+    <div class="max-w-7xl mx-auto">
+        <div class="relative overflow-hidden bg-[#0d1117] p-8 rounded-3xl neon-box mb-8 border border-slate-800">
+            <div class="scan-line"></div>
+            <h1 class="text-4xl font-black text-center text-red-600 tracking-tighter mb-2">ULTIMATE FORENSIC SYSTEM</h1>
+            <p class="text-center text-slate-500 text-[10px] tracking-[0.3em] uppercase">Deep Network & Hardware Analysis Active</p>
             
-            <input type="text" id="ipInput" placeholder="IP လိပ်စာ ရိုက်ထည့်ပါ..." 
-                   class="w-full p-4 mb-4 rounded-lg bg-slate-800 border border-slate-700 focus:outline-none focus:border-red-500 transition text-white placeholder-slate-500">
-            
-            <button onclick="investigate()" id="searchBtn"
-                    class="w-full bg-red-600 hover:bg-red-700 p-4 rounded-lg font-bold transition flex items-center justify-center gap-2">
-                <span>စစ်ဆေးမည်</span>
-            </button>
-
-            <div id="map" class="w-full h-64 mt-8 rounded-xl border border-slate-700 hidden"></div>
-            <div id="result" class="mt-8 hidden space-y-4"></div>
+            <div class="mt-8 flex flex-col md:flex-row gap-4 max-w-2xl mx-auto">
+                <input type="text" id="ipInput" placeholder="Enter Target IP..." 
+                       class="flex-1 bg-[#161b22] border border-slate-700 p-4 rounded-xl focus:outline-none focus:border-red-500 transition text-white">
+                <button onclick="investigate()" id="searchBtn" 
+                        class="bg-red-600 hover:bg-red-700 px-10 py-4 rounded-xl font-black text-white transition active:scale-95">
+                    SCAN TARGET
+                </button>
+            </div>
         </div>
 
-        <div class="space-y-6">
-            <div class="bg-slate-800 p-6 rounded-2xl border border-slate-700 h-fit">
-                <h3 class="text-lg font-bold text-red-500 mb-4">💡 System Status</h3>
-                <div id="cache-stats" class="text-xs text-slate-400 space-y-2">
+        <div id="main-content" class="hidden grid grid-cols-1 lg:grid-cols-3 gap-8">
+            
+            <div class="lg:col-span-2 space-y-4">
+                <div class="bg-[#0d1117] p-4 rounded-3xl border border-slate-800">
+                    <div id="map"></div>
+                    <div class="mt-4 flex justify-between items-center text-[10px] text-slate-500 px-2">
+                        <span id="coords">COORDINATES: --, --</span>
+                        <span id="timestamp">LAST SCAN: JUST NOW</span>
                     </div>
+                </div>
+            </div>
+
+            <div class="space-y-6">
+                <div class="bg-[#0d1117] p-6 rounded-3xl border border-slate-800">
+                    <h3 class="text-red-500 font-bold text-xs mb-6 tracking-widest uppercase">Network Intelligence</h3>
+                    <div class="space-y-4">
+                        <div>
+                            <p class="text-[9px] text-slate-500 uppercase">Service Provider (ISP)</p>
+                            <p id="d-isp" class="text-sm font-bold text-white">-</p>
+                        </div>
+                        <div>
+                            <p class="text-[9px] text-slate-500 uppercase">Connection Status</p>
+                            <p id="d-status" class="text-sm font-bold">-</p>
+                        </div>
+                        <div>
+                            <p class="text-[9px] text-slate-500 uppercase">Local Time (Target)</p>
+                            <p id="d-time" class="text-sm font-bold text-yellow-500">-</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-[#0d1117] p-6 rounded-3xl border border-slate-800">
+                    <h3 class="text-blue-500 font-bold text-xs mb-6 tracking-widest uppercase">Hardware Intelligence</h3>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <p class="text-[9px] text-slate-500 uppercase">Device</p>
+                            <p id="d-device" class="text-xs font-bold text-white">-</p>
+                        </div>
+                        <div>
+                            <p class="text-[9px] text-slate-500 uppercase">Battery</p>
+                            <p id="d-battery" class="text-xs font-bold text-emerald-400">-</p>
+                        </div>
+                        <div>
+                            <p class="text-[9px] text-slate-500 uppercase">OS/Platform</p>
+                            <p id="d-os" class="text-xs font-bold text-white">-</p>
+                        </div>
+                        <div>
+                            <p class="text-[9px] text-slate-500 uppercase">Browser</p>
+                            <p id="d-browser" class="text-xs font-bold text-white">-</p>
+                        </div>
+                    </div>
+                    <div class="mt-6 pt-4 border-t border-slate-800">
+                        <p class="text-[9px] text-slate-500 uppercase mb-2">Device Fingerprint (HID)</p>
+                        <code id="d-fp" class="text-[8px] bg-black p-2 rounded block text-red-500 truncate">---</code>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -41,108 +98,95 @@
         const fpPromise = FingerprintJS.load();
         let map = null;
 
+        async function getBattery() {
+            try {
+                const bt = await navigator.getBattery();
+                return `${Math.round(bt.level * 100)}% ${bt.charging ? '⚡' : '🔋'}`;
+            } catch { return "N/A"; }
+        }
+
+        function getDetailedHardware() {
+            const ua = navigator.userAgent;
+            let device = "PC/Desktop";
+            if (/iPhone/.test(ua)) device = "iPhone";
+            else if (/Android/.test(ua)) device = "Android Mobile";
+            
+            let browser = "Web Browser";
+            if (ua.includes("Chrome")) browser = "Google Chrome";
+            else if (ua.includes("Safari") && !ua.includes("Chrome")) browser = "Apple Safari";
+            else if (ua.includes("Firefox")) browser = "Mozilla Firefox";
+
+            return { device, browser, platform: navigator.platform };
+        }
+
         async function investigate() {
             const ip = document.getElementById('ipInput').value.trim();
-            const resDiv = document.getElementById('result');
+            if(!ip) return alert("Target IP လိပ်စာ ရိုက်ထည့်ပါ!");
+
             const btn = document.getElementById('searchBtn');
-            const mapDiv = document.getElementById('map');
+            btn.disabled = true;
+            btn.innerText = "PENETRATING...";
 
-            if(!ip) return alert("IP လိပ်စာ ထည့်ပေးပါဦး သာကြီး!");
-
-            // 1. Caching Check (API ခြွေတာရေး)
-            const localCache = localStorage.getItem(`ip_cache_${ip}`);
-            if (localCache) {
-                console.log("Loading from cache...");
-                renderUI(JSON.parse(localCache), true);
+            // Caching Check
+            const cached = localStorage.getItem(`forensic_cache_${ip}`);
+            if(cached) {
+                renderUI(JSON.parse(cached));
+                btn.disabled = false;
+                btn.innerText = "SCAN TARGET";
                 return;
             }
-
-            btn.disabled = true;
-            btn.innerHTML = `<span class="animate-spin">🌀</span> Analyzing...`;
-            resDiv.classList.remove('hidden');
-            resDiv.innerHTML = "<div class='text-center animate-pulse text-red-400'>Accessing Intelligence Database...</div>";
 
             try {
                 const response = await fetch(`/api/lookup?ip=${ip}`);
                 const data = await response.json();
-                if (data.error) throw new Error(data.error);
-
-                // API ကရလာတဲ့ Data ကို Cache သိမ်းမယ်
-                localStorage.setItem(`ip_cache_${ip}`, JSON.stringify(data));
-                
-                renderUI(data, false);
-
-            } catch (error) {
-                resDiv.innerHTML = `<div class='bg-red-900/50 p-4 rounded text-red-400 text-center border border-red-800'>Error: ${error.message}</div>`;
+                localStorage.setItem(`forensic_cache_${ip}`, JSON.stringify(data));
+                renderUI(data);
+            } catch (e) {
+                alert("Scan Failed: " + e.message);
             } finally {
                 btn.disabled = false;
-                btn.innerText = "စစ်ဆေးမည်";
+                btn.innerText = "SCAN TARGET";
             }
         }
 
-        async function renderUI(data, isCached) {
-            const resDiv = document.getElementById('result');
-            const mapDiv = document.getElementById('map');
-            const fp = await fpPromise;
-            const fpResult = await fp.get();
-            const visitorId = fpResult.visitorId;
-
-            // Multi-Account Check Logic
-            let history = JSON.parse(localStorage.getItem('device_history') || '{}');
-            let fraudWarning = "";
-            if (history[visitorId] && history[visitorId] !== data.ip_address) {
-                fraudWarning = `<div class="bg-orange-900/40 border border-orange-500 p-3 rounded text-orange-200 text-[10px] mb-4">⚠️ SECURITY ALERT: This device was previously seen with IP: ${history[visitorId]}</div>`;
-            }
-            history[visitorId] = data.ip_address;
-            localStorage.setItem('device_history', JSON.stringify(history));
-
-            const riskScore = data.security?.threat_score || 0;
+        async function renderUI(data) {
+            document.getElementById('main-content').classList.remove('hidden');
+            
+            // Network Data
+            document.getElementById('d-isp').innerText = data.connection?.isp_name || "Unknown ISP";
+            const risk = data.security?.threat_score || 0;
             const isVPN = data.security?.is_vpn;
-            const statusColor = (isVPN || riskScore > 40) ? 'border-red-500' : 'border-emerald-500';
+            
+            const statusNode = document.getElementById('d-status');
+            statusNode.innerText = isVPN ? "⚠️ VPN/PROXY DETECTED" : (risk < 10 ? "✅ CONNECTION CLEAN" : "🚨 UNSECURED");
+            statusNode.className = isVPN || risk > 40 ? "text-sm font-bold text-red-500 animate-pulse" : "text-sm font-bold text-emerald-400";
 
-            resDiv.classList.remove('hidden');
-            resDiv.innerHTML = `
-                <div class="border-l-4 ${statusColor} bg-slate-800/50 p-5 rounded-r-lg relative">
-                    ${isCached ? '<span class="absolute top-2 right-2 text-[10px] bg-blue-600 px-2 rounded-full text-white">CACHED DATA</span>' : ''}
-                    ${fraudWarning}
-                    <div class="flex items-center gap-3 mb-4">
-                        <img src="https://flagcdn.com/w40/${data.country_code.toLowerCase()}.png" class="w-8 h-6 rounded shadow-sm border border-slate-700">
-                        <h3 class="font-bold text-lg text-white">${data.country || "Unknown"} (${data.city || "N/A"})</h3>
-                    </div>
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                        <div>
-                            <p class="text-slate-500">ISP / Organization</p>
-                            <p class="text-slate-200 font-medium">${data.connection?.isp_name || "N/A"}</p>
-                        </div>
-                        <div>
-                            <p class="text-slate-500">Connection Type</p>
-                            <p class="text-slate-200 font-medium capitalize">${data.connection?.connection_type || "N/A"}</p>
-                        </div>
-                        <div>
-                            <p class="text-slate-500">Risk Score</p>
-                            <p class="${riskScore > 40 ? 'text-red-400' : 'text-emerald-400'} font-bold">${riskScore}/100</p>
-                        </div>
-                        <div>
-                            <p class="text-slate-500">Device Fingerprint</p>
-                            <code class="text-[10px] bg-slate-900 p-1 rounded">${visitorId}</code>
-                        </div>
-                    </div>
-                    <p class="font-black text-xl mt-6 ${isVPN ? 'text-red-500' : 'text-emerald-500'}">
-                        ${isVPN ? 'DETECTED: PROXY/VPN' : 'VERIFIED: CLEAN CONNECTION'}
-                    </p>
-                </div>
-            `;
+            // Timezone Logic
+            const localTime = new Date().toLocaleString("en-US", { timeZone: data.timezone?.name || "Asia/Yangon" });
+            document.getElementById('d-time').innerText = localTime;
 
-            // Update Map
-            mapDiv.classList.remove('hidden');
+            // Hardware Data
+            const hw = getDetailedHardware();
+            document.getElementById('d-device').innerText = hw.device;
+            document.getElementById('d-os').innerText = hw.platform;
+            document.getElementById('d-browser').innerText = hw.browser;
+            document.getElementById('d-battery').innerText = await getBattery();
+
+            // Fingerprint
+            const fp = await fpPromise;
+            const res = await fp.get();
+            document.getElementById('d-fp').innerText = res.visitorId;
+
+            // Map
+            const lat = data.latitude, lon = data.longitude;
+            document.getElementById('coords').innerText = `COORDINATES: ${lat}, ${lon}`;
             if (!map) {
-                map = L.map('map').setView([data.latitude, data.longitude], 12);
+                map = L.map('map').setView([lat, lon], 14);
                 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
             } else {
-                map.setView([data.latitude, data.longitude], 12);
+                map.setView([lat, lon], 14);
             }
-            L.marker([data.latitude, data.longitude]).addTo(map)
-                .bindPopup(`<b>${data.ip_address}</b><br>${data.city}`).openPopup();
+            L.marker([lat, lon]).addTo(map).bindPopup(`Target: ${data.ip_address}`).openPopup();
         }
     </script>
 </body>
