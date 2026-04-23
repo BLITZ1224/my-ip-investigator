@@ -1,4 +1,5 @@
 export default async function handler(req, res) {
+    // CORS configuration
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET');
 
@@ -11,10 +12,11 @@ export default async function handler(req, res) {
         const response = await fetch(`https://ip-intelligence.abstractapi.com/v1/?api_key=${API_KEY}&ip_address=${ip}`);
         const data = await response.json();
 
-        // နေရာစုံကနေ ISP နာမည်ကို လိုက်ရှာမယ်
+        // ISP နာမည်ကို နေရာစုံကနေ ရှာဖတ်မယ် (ဒါမှ ISP ပျောက်တဲ့ပြဿနာ ရှင်းမှာပါ)
         data.isp_fixed = data.connection?.isp_name || 
                          data.company?.name || 
                          data.connection?.autonomous_system_organization || 
+                         data.connection?.organization_name || 
                          "Unknown ISP";
 
         res.status(200).json(data);
