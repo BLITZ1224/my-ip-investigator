@@ -13,7 +13,7 @@
         .scan-line { height: 2px; background: rgba(239, 68, 68, 0.5); position: absolute; width: 100%; top: 0; animation: scan 3s linear infinite; }
         @keyframes scan { from { top: 0; } to { top: 100%; } }
         .neon-box { border: 1px solid rgba(239, 68, 68, 0.3); box-shadow: 0 0 20px rgba(0,0,0,0.5); }
-        #map { height: 350px; border-radius: 15px; }
+        #map { height: 350px; border-radius: 15px; z-index: 10; }
     </style>
 </head>
 <body class="bg-[#02040a] text-slate-300 min-h-screen p-4 md:p-10 font-sans">
@@ -51,7 +51,7 @@
                     <div class="space-y-4">
                         <div>
                             <p class="text-[9px] text-slate-500 uppercase">Service Provider (ISP)</p>
-                            <p id="d-isp" class="text-sm font-bold text-white">-</p>
+                            <p id="d-isp" class="text-sm font-bold text-white">Loading...</p>
                         </div>
                         <div>
                             <p class="text-[9px] text-slate-500 uppercase">Connection Status</p>
@@ -99,8 +99,11 @@
 
         async function getBattery() {
             try {
-                const bt = await navigator.getBattery();
-                return `${Math.round(bt.level * 100)}% ${bt.charging ? '⚡' : '🔋'}`;
+                if (navigator.getBattery) {
+                    const bt = await navigator.getBattery();
+                    return `${Math.round(bt.level * 100)}% ${bt.charging ? '⚡' : '🔋'}`;
+                }
+                return "N/A";
             } catch { return "N/A"; }
         }
 
@@ -127,20 +130,10 @@
             btn.disabled = true;
             btn.innerText = "PENETRATING...";
 
-            // Caching Check
-            const cached = localStorage.getItem(`forensic_cache_${ip}`);
-            if(cached) {
-                renderUI(JSON.parse(cached));
-                btn.disabled = false;
-                btn.innerText = "SCAN TARGET";
-                return;
-            }
-
             try {
                 const response = await fetch(`/api/lookup?ip=${ip}`);
                 const data = await response.json();
                 if (data.error) throw new Error(data.error);
-                localStorage.setItem(`forensic_cache_${ip}`, JSON.stringify(data));
                 renderUI(data);
             } catch (e) {
                 alert("Scan Failed: " + e.message);
@@ -152,7 +145,9 @@
 
         async function renderUI(data) {
             document.getElementById('main-content').classList.remove('hidden');
-            document.getElementById('d-isp').innerText = data.connection?.isp_name || "Unknown ISP";
+            
+            // ISP Display Fix
+            document.getElementById('d-isp').innerText = data.isp_name_fixed || "Unknown ISP";
             
             const risk = data.security?.threat_score || 0;
             const isVPN = data.security?.is_vpn;
@@ -175,6 +170,7 @@
 
             const lat = data.latitude, lon = data.longitude;
             document.getElementById('coords').innerText = `COORDINATES: ${lat}, ${lon}`;
+            
             if (!map) {
                 map = L.map('map').setView([lat, lon], 14);
                 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
