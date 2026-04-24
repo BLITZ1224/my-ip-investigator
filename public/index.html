@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Z-SPACE | Forensic Ultimate</title>
+    <title>Z-SPACE | Forensic Ultimate V2</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/@fingerprintjs/fingerprintjs@4/dist/fp.min.js"></script>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
@@ -14,6 +14,7 @@
         @keyframes scan { from { top: 0; } to { top: 100%; } }
         .neon-box { border: 1px solid rgba(239, 68, 68, 0.3); box-shadow: 0 0 20px rgba(0,0,0,0.5); }
         #map { height: 350px; border-radius: 15px; z-index: 10; border: 1px solid #1e293b; }
+        .alert-active { border: 2px solid #ef4444 !important; animation: pulse-red 1s infinite; }
     </style>
 </head>
 <body class="bg-[#02040a] text-slate-300 min-h-screen p-4 md:p-10 font-sans">
@@ -22,7 +23,7 @@
         <div class="relative overflow-hidden bg-[#0d1117] p-8 rounded-3xl neon-box mb-8 border border-slate-800 shadow-2xl">
             <div class="scan-line"></div>
             <h1 class="text-4xl font-black text-center text-red-600 tracking-tighter mb-2">ULTIMATE FORENSIC SYSTEM</h1>
-            <p class="text-center text-slate-500 text-[10px] tracking-[0.3em] uppercase">Deep Network & Hardware Analysis Active</p>
+            <p class="text-center text-slate-500 text-[10px] tracking-[0.3em] uppercase">Intelligence Persistent Tracking Active</p>
             
             <div class="mt-8 flex flex-col md:flex-row gap-4 max-w-2xl mx-auto">
                 <input type="text" id="ipInput" placeholder="Enter Target IP..." 
@@ -34,19 +35,23 @@
             </div>
         </div>
 
+        <div id="alert-zone" class="hidden mb-6 p-4 bg-red-900/20 border border-red-500/50 rounded-2xl text-red-500 text-center font-bold text-sm animate-pulse">
+            ⚠️ WARNING: IDENTITY MATCHED ON DIFFERENT IP!
+        </div>
+
         <div id="main-content" class="hidden grid grid-cols-1 lg:grid-cols-3 gap-8">
             <div class="lg:col-span-2 space-y-4">
                 <div class="bg-[#0d1117] p-4 rounded-3xl border border-slate-800">
                     <div id="map"></div>
                     <div class="mt-4 flex justify-between items-center text-[10px] text-slate-500 px-2">
                         <span id="coords">COORDINATES: --, --</span>
-                        <span id="timestamp">SECURITY LEVEL: MONITORED</span>
+                        <span id="ip-history" class="text-blue-400 font-bold uppercase">History: Clear</span>
                     </div>
                 </div>
             </div>
 
             <div class="space-y-6">
-                <div class="bg-[#0d1117] p-6 rounded-3xl border border-slate-800">
+                <div id="network-card" class="bg-[#0d1117] p-6 rounded-3xl border border-slate-800 transition-all duration-500">
                     <h3 class="text-red-500 font-bold text-xs mb-6 tracking-widest uppercase">Network Intelligence</h3>
                     <div class="space-y-4">
                         <div>
@@ -58,7 +63,7 @@
                             <p id="d-status" class="text-sm font-bold">-</p>
                         </div>
                         <div>
-                            <p class="text-[9px] text-slate-500 uppercase">Target Local Time</p>
+                            <p class="text-[9px] text-slate-500 uppercase">Target Local Time (LIVE)</p>
                             <p id="d-time" class="text-sm font-bold text-yellow-500">-</p>
                         </div>
                     </div>
@@ -96,6 +101,11 @@
     <script>
         const fpPromise = FingerprintJS.load();
         let map = null;
+        let clockInterval = null;
+
+        // Local Tracking Logic
+        let lastScannedIP = localStorage.getItem('z_last_ip');
+        let lastScannedFP = localStorage.getItem('z_last_fp');
 
         async function getBattery() {
             try {
@@ -130,13 +140,18 @@
             btn.disabled = true;
             btn.innerText = "PENETRATING...";
 
+            // Cache Busting with Timestamp
+            const ts = new Date().getTime();
+
             try {
-                const response = await fetch(`/api/lookup?ip=${ip}`);
+                const response = await fetch(`/api/lookup?ip=${ip}&t=${ts}`, {
+                    cache: 'no-store'
+                });
                 const data = await response.json();
                 if (data.error) throw new Error(data.error);
                 renderUI(data);
             } catch (e) {
-                alert(e.message);
+                alert("Scan Error: " + e.message);
             } finally {
                 btn.disabled = false;
                 btn.innerText = "SCAN TARGET";
@@ -145,30 +160,72 @@
 
         async function renderUI(data) {
             document.getElementById('main-content').classList.remove('hidden');
+            document.getElementById('alert-zone').classList.add('hidden');
+            document.getElementById('network-card').classList.remove('alert-active');
             
-            // ISP Display Fix: Backend ကပေးတဲ့ isp_name_fixed ကို သုံးမယ်
-            document.getElementById('d-isp').innerText = data.isp_name_fixed || "Unknown ISP";
-            
-            const risk = data.security?.threat_score || 0;
+            const currentIP = data.ip_address;
+            const fpObj = await fpPromise;
+            const fpResult = await fpObj.get();
+            const currentFP = fpResult.visitorId;
+
+            // 1. IP History Tracking
+            const historyNode = document.getElementById('ip-history');
+            if (lastScannedIP === currentIP) {
+                historyNode.innerText = "History: REPEAT IP SOURCE";
+                historyNode.className = "text-yellow-500 font-bold uppercase";
+            } else {
+                historyNode.innerText = "History: NEW SOURCE";
+                historyNode.className = "text-blue-400 font-bold uppercase";
+            }
+
+            // 2. Identity & VPN Matching (နိုင်ငံကျော်လည်း ဖမ်းတဲ့ logic)
             const isVPN = data.security?.is_vpn;
+            const risk = data.security?.threat_score || 0;
             const statusNode = document.getElementById('d-status');
-            statusNode.innerText = isVPN ? "⚠️ VPN/PROXY DETECTED" : (risk < 40 ? "✅ CONNECTION CLEAN" : "🚨 UNSECURED");
-            statusNode.className = isVPN || risk > 40 ? "text-sm font-bold text-red-500 animate-pulse" : "text-sm font-bold text-emerald-400";
+            const ispNode = document.getElementById('d-isp');
 
-            const localTime = new Date().toLocaleString("en-US", { timeZone: data.timezone?.name || "Asia/Yangon" });
-            document.getElementById('d-time').innerText = localTime;
+            ispNode.innerText = isVPN ? `🚨 ${data.isp_name_fixed} (VPN DETECTED)` : data.isp_name_fixed;
+            
+            if (isVPN) {
+                statusNode.innerText = "🚨 VPN/PROXY ACTIVE (Bypassing...)";
+                statusNode.className = "text-sm font-bold text-red-500 animate-pulse";
+                document.getElementById('network-card').classList.add('alert-active');
+            } else {
+                statusNode.innerText = risk < 40 ? "✅ DIRECT CONNECTION" : "🚨 UNSECURED SOURCE";
+                statusNode.className = risk < 40 ? "text-sm font-bold text-emerald-400" : "text-sm font-bold text-red-500";
+            }
 
+            // Persistent Identity Check (IP ပြောင်းပေမဲ့ လူတူနေရင်)
+            if (lastScannedFP === currentFP && lastScannedIP !== currentIP) {
+                document.getElementById('alert-zone').classList.remove('hidden');
+                document.getElementById('alert-zone').innerText = `🚨 IDENTITY MATCH: Target moved from ${lastScannedIP} to ${currentIP}`;
+            }
+
+            // Save for next comparison
+            localStorage.setItem('z_last_ip', currentIP);
+            localStorage.setItem('z_last_fp', currentFP);
+            lastScannedIP = currentIP;
+            lastScannedFP = currentFP;
+
+            // LIVE Clock
+            if(clockInterval) clearInterval(clockInterval);
+            clockInterval = setInterval(() => {
+                const liveTime = new Date().toLocaleString("en-US", { 
+                    timeZone: data.timezone?.name || "Asia/Yangon",
+                    hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true 
+                });
+                document.getElementById('d-time').innerText = liveTime;
+            }, 1000);
+
+            // UI Data Mapping
             const hw = getDetailedHardware();
             document.getElementById('d-device').innerText = hw.device;
             document.getElementById('d-os').innerText = hw.platform;
             document.getElementById('d-browser').innerText = hw.browser;
             document.getElementById('d-battery').innerText = await getBattery();
+            document.getElementById('d-fp').innerText = currentFP;
 
-            const fp = await fpPromise;
-            const res = await fp.get();
-            document.getElementById('d-fp').innerText = res.visitorId;
-
-            // Map Logic with Error Prevention
+            // Map Implementation
             const lat = data.latitude, lon = data.longitude;
             if (lat && lon) {
                 document.getElementById('coords').innerText = `COORDINATES: ${lat}, ${lon}`;
@@ -178,9 +235,7 @@
                 } else {
                     map.setView([lat, lon], 14);
                 }
-                L.marker([lat, lon]).addTo(map).bindPopup(`Target: ${data.ip_address}`).openPopup();
-            } else {
-                document.getElementById('coords').innerText = "COORDINATES: UNAVAILABLE";
+                L.marker([lat, lon]).addTo(map).bindPopup(`Target IP: ${currentIP}`).openPopup();
             }
         }
     </script>
